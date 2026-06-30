@@ -2,6 +2,7 @@
 firmalar.json
 ayarlar.json
 hesaplar.json
+yedekler/
 
 # Yerel Excel Klasöründeki Dosyalar (Örnek şablon hariç)
 excel_belgeleri/*
