@@ -316,8 +316,6 @@ HTML_TEMPLATE = """
                     <li><strong>İade Faturaları Uyarısı:</strong> Eğer iade faturası kesiyorsanız ve fatura tarihi girilmemişse, sistem hata uyarısını otomatik kapatarak bugünün tarihini takvimden seçmeyi yeniden deneyecektir.</li>
                     <li><strong>Faturaları İşle:</strong> Her şey hazır olduğunda <strong>Faturaları İşle</strong> butonuna basarak tüm ürün girişlerini ve iskontoları otomatik olarak Ödeal sistemine kaydettirin.</li>
                 </ol>
-                
-                <p style="color: var(--warning-color); font-weight: bold;">⚠️ Güvenlik Uyarısı: Projeyi GitHub'a yüklerken kesinlikle Private (Özel) depo seçin. Müşteri listeniz ve ayarlarınız gizli kalmalıdır.</p>
             </div>
             <div class="input-group" style="justify-content: flex-end;">
                 <button class="btn-primary" onclick="closeHelpModal()">Anladım</button>

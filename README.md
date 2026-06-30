@@ -2,11 +2,21 @@
 
 Bu proje, Ödeal e-Fatura Portalı üzerinden fatura kesme işlemlerini otomatikleştiren, yerel Excel dosyalarından veri aktarımı yapan akıllı bir otomasyon aracıdır.
 
-> ⚠️ **ÖNEMLİ GÜVENLİK UYARISI:** Bu projeyi GitHub'a yüklerken **kesinlikle PRIVATE (ÖZEL)** depo seçeneğini kullanın. Müşteri bilgileriniz (`firmalar.json`), fatura serisi ayarlarınız (`ayarlar.json`) ve `excel_belgeleri/` altındaki fatura verileriniz `.gitignore` dosyası ile engellenmiştir ve internette herkese açık olarak paylaşılmamalıdır.
+
+
+## 🚀 Öne Çıkan Özellikler
+
+- **Göz Özelliği ile Şifre Göster/Gizle:** Giriş alanlarında şifrenizi doğru yazdığınızı kontrol edebilmeniz için `👁️` / `🙈` göz özelliği eklendi.
+- **Klavye Dostu Arayüz:** Alanlar arasında **Tab** tuşuyla geçiş yapabilir ve **Enter** tuşuna basarak formları hızlıca gönderebilirsiniz.
+- **Güvenli Çıkış Yap Butonu:** Sol menüdeki **HESAPTAN ÇIKIŞ YAP** butonuyla tarayıcı oturumunu güvenli bir şekilde kapatabilir ve arka plandaki ChromeDriver sürecini sonlandırabilirsiniz.
+- **F5 Durum Koruma (Sayfa Yenileme Desteği):** Sayfaya F5 atsanız dahi o an bulunduğunuz sekme (aktif alan) ve seçmiş olduğunuz firma bilgileri hafızada tutulmaya devam eder.
+- **Otomatik Kod Yenileyici (Hot Reloading):** Projedeki dosyalarda değişiklik yaptığınızda, sunucu otomatik olarak güncel haliyle yeniden başlatılır (Klasör yolunda boşluk olması durumu dahi güvenle desteklenir).
+- **Özel Arayüz Bildirimleri:** Tarayıcının üstünden çıkan rahatsız edici standart uyarı pencereleri yerine ekran içi özel tasarım bildirimler entegre edilmiştir.
+- **Akıllı Hata Yönetimi & Otomatik Kurtarma:** Giriş bilgileri yanlış olduğunda tarayıcı otomatik olarak yenilenir ve temiz bir giriş ekranıyla yeniden başlamanız sağlanır.
 
 ---
 
-## 🚀 Kurulum Adımları
+## ⚙️ Kurulum Adımları
 
 1. **Python Yükleme:** Bilgisayarınızda Python 3.8 veya üzeri bir sürümün yüklü olduğundan emin olun.
 2. **Bağımlılıkları Yükleme:** Terminal veya Komut İstemi (CMD) üzerinden proje klasörüne gidip aşağıdaki kütüphaneleri yükleyin:
@@ -24,9 +34,12 @@ Bu proje, Ödeal e-Fatura Portalı üzerinden fatura kesme işlemlerini otomatik
 ## 📂 Klasör Yapısı
 
 * **`excel_belgeleri/`**: Fatura kesilecek Excel dosyalarını buraya yerleştirebilirsiniz. Arayüzden bu dosyaları tek tıkla ("Hızlı Excel Getir") seçip yükleyebilirsiniz.
-* **`main_browser.py`**: Uygulamanın ana kaynak kodu ve web sunucu motorudur.
-* **`firmalar.json`**: Tanımladığınız firmaların listesini barındırır.
-* **`ayarlar.json`**: Faturanın kesileceği seri numarasının sırasını takip eder.
+* **`yedekler/`**: Şifreleriniz, ayarlarınız ve firma tanımlarınız gibi tüm hassas veriler (.gitignore'a dahil şekilde) burada saklanır:
+  - `firmalar.json`: Tanımladığınız firmaların listesini barındırır.
+  - `ayarlar.json`: Faturanın kesileceği seri numarasının sırasını takip eder.
+  - `hesaplar.json`: Manuel eklediğiniz veya başarılı giriş yaptığınız hesapların listesini barındırır.
+* **`main_browser.py`**: Uygulamanın ana çalıştırma dosyası, dosya izleyicisi ve web sunucu motorudur.
+* **`src/`**: Sunucu, HTML şablonları ve Selenium otomasyon betiklerinin yer aldığı çekirdek kod dizinidir.
 
 ---
 
