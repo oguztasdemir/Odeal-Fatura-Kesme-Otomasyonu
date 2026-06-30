@@ -1,0 +1,20 @@
+# Database / Veri Dosyaları (Hassas Veriler)
+firmalar.json
+ayarlar.json
+hesaplar.json
+
+# Yerel Excel Klasöründeki Dosyalar (Örnek şablon hariç)
+excel_belgeleri/*
+!excel_belgeleri/ornek.xlsx
+
+# Python Önbellek Dosyaları
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Sanal Ortam Dosyaları
+.venv/
+venv/
+env/
+.env
