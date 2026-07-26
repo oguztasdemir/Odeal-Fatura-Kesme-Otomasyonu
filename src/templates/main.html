@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ödeal | Akıllı Fatura Paneli (Web)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">ÖDEAL</div>
+        <div class="status-badge" id="system-status">● Sistem Hazır</div>
+        
+        <div id="sidebar-logged-out-msg" style="display: none; padding: 20px 10px; text-align: center; color: #ffea00; font-weight: 600; font-size: 13px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: 10px; margin-bottom: 20px;">
+            🔑 Lütfen Hesaba Giriş Yapın
+        </div>
+        
+        <button class="nav-btn active" id="nav-panel" onclick="switchSection('panel')">💻 Fatura İade / Kesme</button>
+        <button class="nav-btn" id="nav-download" onclick="switchSection('download')">📥 Fatura İndir</button>
+        <button class="nav-btn" id="nav-downloads-list" onclick="switchSection('downloads-list')">📂 İndirilen Dosyalar</button>
+        <button class="nav-btn" id="nav-history" onclick="switchSection('history')">📜 İşlem Geçmişi</button>
+        <button class="nav-btn" id="nav-companies-list" onclick="switchSection('companies-list')">🏢 Çalıştığımız Firmalar</button>
+        <button class="nav-btn" id="nav-accounts" onclick="switchSection('accounts')">🔑 Hesap Yönetimi</button>
+        <button class="nav-btn" id="nav-settings" onclick="switchSection('settings')">⚙️ Ayarlar</button>
+        
+        <button class="btn-secondary" style="width: 100%; margin-top: 15px;" onclick="openHelpModal()">❓ Yardım & Hakkında</button>
+        <button class="btn-primary" style="width: 100%; margin-top: auto; background-color: #00bcd4; color: white;" onclick="reloadCode()">🔄 KODU GÜNCELLE</button>
+        <button class="btn-danger" style="width: 100%; margin-top: 10px;" onclick="stopProcess()">🛑 TÜMÜNÜ DURDUR</button>
+        <button class="btn-secondary" style="width: 100%; margin-top: 10px; background-color: #d32f2f; color: white;" onclick="logout()">🚪 HESAPTAN ÇIKIŞ YAP</button>
+    </div>
+    
+    <div class="main-panel">
+        <!-- 0. Giriş Yapılmamışsa Gösterilecek Panel -->
+        <div id="section-login">
+            <div class="card" style="max-width: 600px; margin: 50px auto;">
+                <div class="card-header" style="font-size: 20px;">🔒 Ödeal Portal Girişi</div>
+                <p style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px;">
+                    Sisteme erişebilmek için lütfen kayıtlı hesabınızla veya yeni bir hesap bilgisi girerek giriş yapınız.
+                </p>
+                <div class="input-group" id="login-fields" style="flex-direction: column; gap: 15px; align-items: stretch; margin-bottom: 10px;">
+                    <select id="saved-accounts-select" onchange="autoFillAccount(this.value)" style="width: 100%;">
+                        <option value="">Kayıtlı Hesap Seç...</option>
+                    </select>
+                    <input type="text" id="email" placeholder="E-mail" style="width: 100%;" onkeydown="if(event.key === 'Enter') startLogin()">
+                    <div style="position: relative; display: block; width: 100%;">
+                        <input type="password" id="password" placeholder="Şifre" style="width: 100%; padding-right: 35px;" onkeydown="if(event.key === 'Enter') startLogin()">
+                        <span id="toggle-login-pass" onclick="togglePasswordVisibility('password', 'toggle-login-pass')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; user-select: none; font-size: 16px;">👁️</span>
+                    </div>
+                    <button class="btn-primary" onclick="startLogin()" id="login-btn" style="width: 100%; padding: 12px;">Sistemi Başlat / Giriş Yap</button>
+                </div>
+                <div class="input-group" id="code-fields" style="display: none; flex-direction: column; gap: 15px; align-items: stretch; margin-bottom: 10px;">
+                    <input type="text" id="auth-code" placeholder="6 Haneli Doğrulama Kodu" style="width: 100%;" oninput="if(this.value.trim().length === 6) confirmCode()" onkeydown="if(event.key === 'Enter') confirmCode()">
+                    <button class="btn-success" onclick="confirmCode()" id="confirm-code-btn" style="width: 100%; padding: 12px;">Kodu Onayla</button>
+                </div>
+                <div id="login-status-message" style="margin-top: 15px; font-weight: 600; font-size: 14px; display: none; text-align: center;"></div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; max-width: 600px; margin: 10px auto -15px auto; gap: 8px;">
+                <button class="btn-danger" style="padding: 6px 12px; font-size: 11px; border-radius: 4px;" onclick="copyOnlyErrors('login-logs-container')">⚠️ Hataları Kopyala</button>
+                <button class="btn-secondary" style="padding: 6px 12px; font-size: 11px; border-radius: 4px;" onclick="clearLogs()">🧹 Logu Temizle</button>
+            </div>
+            
+            <!-- Canlı Loglar (Giriş için) -->
+            <div class="log-card" id="login-logs-container" style="max-width: 600px; margin: 20px auto;">
+                <div class="log-line">Giriş yapılması bekleniyor...</div>
+            </div>
+        </div>
+
+        <div id="section-panel" style="display: none;">
+            <!-- 1. Firma Seçimi -->
+            <div class="card">
+                <div class="card-header">🏢 1. Firma Seçimi</div>
+                <div class="input-group">
+                    <select id="company-select" style="width: 300px;" onchange="selectCompany(this.value)">
+                        <option value="">Firma seçin...</option>
+                    </select>
+                    <button class="btn-success" onclick="openNewCompanyModal()">+ Yeni</button>
+                    <button class="btn-secondary" onclick="syncCustomersFromOdeal()" style="margin-left: 10px;">👥 Alıcı Listesini Eşitle</button>
+                    <button class="btn-primary" id="prep-btn" onclick="startPrepare()" disabled>Başlat</button>
+                </div>
+                
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Vergi No</span>
+                        <span class="detail-val" id="lbl-tax-no">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Şehir</span>
+                        <span class="detail-val" id="lbl-city">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">İlçe</span>
+                        <span class="detail-val" id="lbl-district">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Vergi Dairesi</span>
+                        <span class="detail-val" id="lbl-tax-office">-</span>
+                    </div>
+                    <span class="detail-val fullname-lbl" id="lbl-fullname">-</span>
+                </div>
+            </div>
+
+            <!-- 2. Veri ve Hesaplama -->
+            <div class="card">
+                <div class="card-header">📊 2. Veri ve Hesaplama</div>
+                <div class="input-group">
+                    <button class="btn-secondary" onclick="downloadTemplate()">📥 Şablon</button>
+                    <input type="file" id="excel-file" style="display: none;" onchange="uploadExcel()" accept=".xlsx" multiple>
+                    <button class="btn-primary" onclick="document.getElementById('excel-file').click()">📤 Excel Yükle (Çoklu)</button>
+                    <select id="local-excel-select" style="width: 220px;" onchange="selectLocalExcel(this.value)">
+                        <option value="">Hızlı Excel Getir...</option>
+                    </select>
+                    <button class="btn-secondary" onclick="loadLocalExcelFiles()" title="Klasörü Yenile">🔄</button>
+                    <button class="btn-success" id="process-btn" onclick="startProcessing()" disabled>🚀 Faturaları İşle</button>
+                </div>
+                
+                <!-- Çoklu Excel Sırası Listesi -->
+                <div id="queue-container" style="margin-top: 15px; display: none;">
+                    <div style="font-size: 13px; font-weight: 600; color: #9aa0a6; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>📥 Çoklu Excel Sırası (Fatura Kuyruğu)</span>
+                        <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="clearExcelQueue()">Kuyruğu Temizle</button>
+                    </div>
+                    <div class="table-container" style="max-height: 150px; overflow-y: auto; margin-bottom: 15px;">
+                        <table style="font-size: 12px; margin: 0; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Dosya Adı</th>
+                                    <th style="width: 150px; text-align: center;">Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody id="queue-tbody">
+                                <!-- Queue loads here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ürün Adı</th>
+                                <th>Miktar</th>
+                                <th>Birim</th>
+                                <th>Fiyat</th>
+                                <th>KDV %</th>
+                                <th>İskonto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excel-tbody">
+                            <tr><td colspan="6" style="text-align: center; color: gray;">Henüz veri yüklenmedi</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="kpi-container">
+                    <div class="kpi-card">
+                        <div class="kpi-title">Kalem Sayısı</div>
+                        <div class="kpi-value" id="kpi-kalem">0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">Toplam Miktar</div>
+                        <div class="kpi-value" id="kpi-miktar">0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">KDV Hariç Tutar</div>
+                        <div class="kpi-value" id="kpi-kdvsiz">0.00 TL</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">Toplam İskonto</div>
+                        <div class="kpi-value" id="kpi-iskonto">0.00 TL</div>
+                    </div>
+                    <div class="kpi-card" style="border-color: var(--success-color);">
+                        <div class="kpi-title" style="color: var(--success-color);">Genel Toplam (KDV Dahil)</div>
+                        <div class="kpi-value" id="kpi-toplam" style="color: var(--success-color);">0.00 TL</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Excel İstatistik Grafikleri -->
+            <div id="reports-card" class="card" style="display: none;">
+                <div class="card-header">📊 Excel Veri Analizi</div>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="flex: 2; min-width: 300px; height: 280px; position: relative;">
+                        <canvas id="chart-products"></canvas>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; height: 280px; position: relative;">
+                        <canvas id="chart-kdv"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canlı Konsol Logları -->
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                    <span>📋 Canlı İşlem Logları</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-danger" style="padding: 6px 12px; font-size: 11px; border-radius: 4px;" onclick="copyOnlyErrors('logs-container')">⚠️ Hataları Kopyala</button>
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 11px; border-radius: 4px;" onclick="clearLogs()">🧹 Logu Temizle</button>
+                    </div>
+                </div>
+                <div class="log-card" id="logs-container">
+                    <div class="log-line">Sistem hazır. Excel dosyası yükleyin ve 'Faturaları İşle' butonuna basın.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Fatura İndirme Bölümü -->
+        <div id="section-download" style="display: none;">
+            <div class="card">
+                <div class="card-header">📥 Toplu Fatura Yedekleme / İndirme</div>
+                <p style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px;">
+                    Portal üzerindeki faturaları belirlediğiniz tarih aralıklarına veya kaldığı yerden devam ederek otomatik yedekleyebilirsiniz.
+                </p>
+                <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+                    <!-- Left Column: Parameters -->
+                    <div style="flex: 2; min-width: 450px; display: flex; flex-direction: column; gap: 20px;">
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="dl-all-scratch" checked style="width: 18px; height: 18px;" onchange="toggleAllScratch(this.checked)">
+                                <label for="dl-all-scratch" style="font-size: 14px; font-weight: 600; cursor: pointer; color: var(--warning-color);">Tümünü Baştan İndir (Tarih Sınırı Yok)</label>
+                            </div>
+                        </div>
+                        
+                        <div id="dl-manual-dates" style="display: none; gap: 20px; flex-wrap: wrap;">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <span style="font-size: 12px; color: gray;">Başlangıç Tarihi</span>
+                                <input type="date" id="dl-start-date" style="width: 180px;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <span style="font-size: 12px; color: gray;">Bitiş Tarihi</span>
+                                <input type="date" id="dl-end-date" style="width: 180px;">
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <span style="font-size: 12px; color: gray;">Fatura Yönü</span>
+                                <select id="dl-direction" style="width: 180px;">
+                                    <option value="gelen">Gelen Faturalar</option>
+                                    <option value="giden">Giden Faturalar</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <span style="font-size: 12px; color: gray;">Firma / Cari Filtresi</span>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <select id="dl-company-filter" style="width: 200px;" onchange="document.getElementById('dl-filter-query').value = this.value">
+                                        <option value="">Tüm Firmalar</option>
+                                    </select>
+                                    <button class="btn-primary" onclick="syncCustomersFromOdeal()" style="padding: 8px 12px; font-size: 11px; white-space: nowrap; background-color: #00bcd4; color: white; border-radius: 4px; border: none; cursor: pointer;">Firmaların Verilerini Çek 👥</button>
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <span style="font-size: 12px; color: gray;">Manuel Filtre / VKN</span>
+                                <input type="text" id="dl-filter-query" placeholder="Kelime veya VKN girin..." style="width: 180px;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <span style="font-size: 12px; color: gray;">Dosya İndirme Tipi</span>
+                                <select id="dl-type" style="width: 180px;">
+                                    <option value="pdf">Toplu PDF Paketle (ZIP)</option>
+                                    <option value="xml">Toplu XML/E-Fatura Paketle (ZIP)</option>
+                                    <option value="print">Yazıcıya Gönder / Yazdır</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <span style="font-size: 12px; color: gray;">İndirme Sırası</span>
+                                <select id="dl-sort-order" style="width: 200px;">
+                                    <option value="asc">Baştan Sona (Eskiden Yeniye)</option>
+                                    <option value="desc">Sondan Başa (Yeniden Eskiye)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <button class="btn-success" onclick="startInvoiceDownload()" style="padding: 12px 30px;">Bul ve İndirmeyi Başlat</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column: Backup Sessions List -->
+                    <div style="flex: 1; min-width: 300px; border-left: 1px solid #333; padding-left: 20px; display: flex; flex-direction: column; gap: 10px;">
+                        <div style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #00bcd4; display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;">
+                            <span>🗂️ Aktif Yedekleme Oturumları</span>
+                            <button class="btn-primary" onclick="clearSelectedBackupSession()" style="padding: 4px 8px; font-size: 10px; border-radius: 4px;">Yeni Yedek ➕</button>
+                        </div>
+                        <div id="backup-sessions-list" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;">
+                            <div style="font-size: 12px; color: gray; text-align: center; padding: 20px;">Henüz aktif yedekleme oturumu yok.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span>📋 İndirme Logları</span>
+                        <span id="counter-invoices" style="background-color: #3f51b5; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Fatura: 0</span>
+                        <span id="counter-companies" style="background-color: #00bcd4; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Firma: 0</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-danger" style="padding: 6px 12px; font-size: 11px; border-radius: 4px;" onclick="copyOnlyErrors('download-logs-container')">⚠️ Hataları Kopyala</button>
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 11px; border-radius: 4px;" onclick="clearLogs()">🧹 Logu Temizle</button>
+                    </div>
+                </div>
+                <div class="log-card" id="download-logs-container" style="height: 250px;">
+                    <div class="log-line">İndirme başlatılmadı. Parametreleri seçin ve başlatın.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. İndirilen Dosyalar Bölümü -->
+        <div id="section-downloads-list" style="display: none;">
+            <div class="card">
+                <div class="card-header">📂 İndirilmiş Toplu Fatura Paketleri</div>
+                <p style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px;">
+                    Daha önce başarılı bir şekilde indirilip paketlenen fatura arşivlerini buradan bilgisayarınıza indirebilir veya silebilirsiniz.
+                </p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Dosya Adı</th>
+                                <th>Boyut</th>
+                                <th>İndirme Zamanı</th>
+                                <th style="width: 200px; text-align: center;">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="downloads-tbody">
+                            <tr><td colspan="4" style="text-align: center; color: gray; padding: 20px;">Dosya listesi yükleniyor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. İşlem Geçmişi Bölümü -->
+        <div id="section-history" style="display: none;">
+            <div class="card">
+                <div class="card-header" style="justify-content: space-between; flex-wrap: wrap;">
+                    <span>📜 Kesilen Fatura İşlem Geçmişi</span>
+                    <button class="btn-success" onclick="exportHistoryToExcel()" style="padding: 6px 15px; font-size: 12px;">📊 Muhasebe Raporu Al (Excel)</button>
+                </div>
+                <p style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px;">
+                    Bu sistem üzerinden kesilen tüm faturaların özet kayıtları aşağıda listelenmiştir. Listede arama yapabilirsiniz.
+                </p>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <input type="text" id="history-search-input" oninput="filterHistoryTable()" placeholder="Firma unvanı veya fatura no ile ara..." style="width: 100%; max-width: 400px;">
+                </div>
+                <div class="table-container" style="max-height: 450px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>İşlem Tarihi</th>
+                                <th>Fatura No</th>
+                                <th>Firma Ünvanı</th>
+                                <th style="text-align: center;">Kalem</th>
+                                <th style="text-align: right;">Toplam Tutar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                            <tr><td colspan="5" style="text-align: center; color: gray; padding: 20px;">İşlem geçmişi yükleniyor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Hesap Yönetimi Bölümü -->
+        <div id="section-accounts" style="display: none;">
+            <div class="card" style="max-width: 700px;">
+                <div class="card-header">🔑 Ödeal Hesap Yönetimi</div>
+                <p style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px;">
+                    Sık kullandığınız Ödeal portal hesap bilgilerinizi (E-posta ve şifre) şifreli olarak kaydederek panel açılışında tek tıkla otomatik doldurabilirsiniz.
+                </p>
+                <div class="input-group" style="gap: 15px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;">
+                    <input type="text" id="acc-email" placeholder="E-posta" style="flex: 1; min-width: 200px;">
+                    <div style="position: relative; flex: 1; min-width: 200px;">
+                        <input type="password" id="acc-password" placeholder="Şifre" style="width: 100%; padding-right: 35px;">
+                        <span id="toggle-acc-pass" onclick="togglePasswordVisibility('acc-password', 'toggle-acc-pass')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; user-select: none; font-size: 16px;">👁️</span>
+                    </div>
+                </div>
+                <div class="input-group" style="gap: 15px; align-items: center; margin-bottom: 25px;">
+                    <input type="text" id="acc-2fa" placeholder="2FA Gizli Anahtarı (Kurulum Kodu - İsteğe Bağlı)" style="flex: 1;">
+                    <button class="btn-success" onclick="saveAccountManually()">Ekle / Güncelle</button>
+                </div>
+                
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 12px; color: var(--accent-color);">💾 Kayıtlı Hesaplar</div>
+                <div style="display: flex; flex-direction: column; gap: 10px;" id="saved-accounts-list">
+                    <!-- Accounts load here -->
+                </div>
+                
+                <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                    <button class="btn-danger" onclick="resetAccountsData()">⚠️ KAYITLI TÜM HESAPLARI TEMİZLE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Ayarlar Bölümü -->
+        <div id="section-settings" style="display: none;">
+            <div class="card" style="max-width: 600px;">
+                <div class="card-header">⚙️ Fatura Seri ve Numaralandırma Ayarları</div>
+                <p style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px;">
+                    Kesilecek faturaların seri ön ekini (3 karakterli harf grubu) ve sıradaki fatura numarasını buradan yönetin. 
+                    Bu ayarlar her başarılı fatura kesme işleminde otomatik olarak +1 artırılır.
+                </p>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; font-weight: 600;">Fatura Seri Ön Eki (3 Harfli):</span>
+                        <input type="text" id="setting-serial-prefix" maxlength="3" style="width: 100px; text-transform: uppercase; text-align: center;" placeholder="YRN">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; font-weight: 600;">Sıradaki Fatura Numarası:</span>
+                        <input type="number" id="setting-serial" style="width: 180px; text-align: right;" placeholder="42">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; font-weight: 600;">Fatura Kesim Modu:</span>
+                        <select id="setting-finalization-mode" style="width: 180px;">
+                            <option value="manual">Taslak Olarak Kaydet (Manuel Gönder)</option>
+                            <option value="auto">Kaydet ve Otomatik Gönder (İmza/SMS)</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; font-weight: 600;">Fatura Senaryosu:</span>
+                        <select id="setting-invoice-scenario" style="width: 180px;">
+                            <option value="TEMEL">Temel Fatura</option>
+                            <option value="TICARI">Ticari Fatura</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; font-weight: 600;">Fatura Tipi / Türü:</span>
+                        <select id="setting-invoice-type" style="width: 180px;">
+                            <option value="SATIS">Satış Faturası</option>
+                            <option value="IADE">İade Faturası</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                        <button class="btn-success" onclick="updateSerialSettings()" style="padding: 10px 25px;">Ayarları Kaydet</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" style="max-width: 600px;">
+                <div class="card-header" style="color: var(--danger-color);">🎨 Tema Ayarları</div>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn-secondary" style="flex: 1; background-color: #263238;" onclick="setTheme('dark')">🌙 Karanlık Tema (Varsayılan)</button>
+                    <button class="btn-secondary" style="flex: 1; background-color: #cfd8dc; color: #263238;" onclick="setTheme('light')">☀️ Aydınlık Tema</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. Çalıştığımız Firmalar Section -->
+        <div id="section-companies-list" style="display: none; padding: 20px;">
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span>🏢 Çalıştığımız Firmalar</span>
+                        <span class="badge" id="companies-count-badge" style="background-color: #00bcd4; color: #fff; font-size: 13px; font-weight: 600; padding: 3px 8px; border-radius: 4px;">0 Firma</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary" onclick="syncCustomersFromOdeal()" style="background-color: #00bcd4; padding: 8px 16px; font-size: 13px;">Firmaların Verilerini Çek 👥</button>
+                        <button class="btn-success" onclick="openNewCompanyModal()" style="padding: 8px 16px; font-size: 13px;">➕ Yeni Firma Ekle</button>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px;">
+                    Portal üzerinden senkronize edilen veya manuel eklenen, çalıştığımız tüm alıcı/cari firmaların listesi. Bu veriler sistemde güvenle yedeklenir.
+                </p>
+                
+                <!-- Toplu İşlemler Barı -->
+                <div id="company-bulk-actions" style="display: none; gap: 10px; margin-bottom: 15px; align-items: center; background-color: #1e1e24; padding: 10px; border-radius: 6px; border: 1px solid #333; flex-wrap: wrap;">
+                    <span style="font-size: 13px; color: gray;" id="company-selected-count">0 firma seçildi</span>
+                    <button class="btn-danger" onclick="bulkDeleteCompanies()" style="padding: 6px 12px; font-size: 12px; border-radius: 4px;">Seçilenleri Sil 🗑️</button>
+                    <button class="btn-secondary" onclick="bulkExportCompanies()" style="padding: 6px 12px; font-size: 12px; background-color: #455a64; color: white; border-radius: 4px; border: none; cursor: pointer;">Seçilenleri Excel'e Aktar 📊</button>
+                </div>
+                
+                <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="company-search-input" placeholder="Firma adı veya VKN arayın..." oninput="filterCompaniesTable()" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--input-bg); color: white;">
+                </div>
+
+                <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;"><input type="checkbox" id="company-select-all" onchange="toggleSelectAllCompanies(this.checked)"></th>
+                                <th>Firma Ünvanı</th>
+                                <th>VKN / TCKN</th>
+                                <th>İl</th>
+                                <th>İlçe</th>
+                                <th>Vergi Dairesi</th>
+                                <th style="text-align: center; width: 100px;">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="companies-table-tbody">
+                            <!-- Loaded dynamically from js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="new-company-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 1000;">
+        <div class="card" style="width: 400px; background-color: var(--card-color); border: 1px solid var(--border-color);">
+            <div class="card-header">🏢 Yeni Firma Ekle</div>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
+                <input type="text" id="new-title" placeholder="Firma Başlığı (Not)">
+                <input type="text" id="new-tax" placeholder="Vergi No">
+                <input type="text" id="new-city" placeholder="Şehir">
+                <input type="text" id="new-district" placeholder="İlçe">
+                <input type="text" id="new-office" placeholder="Vergi Dairesi">
+            </div>
+            <div class="input-group" style="justify-content: flex-end;">
+                <button class="btn-secondary" onclick="closeNewCompanyModal()">İptal</button>
+                <button class="btn-success" onclick="saveNewCompany()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel Kolon Eşleştirme Modalı -->
+    <div id="excel-mapping-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000; overflow-y: auto;">
+        <div class="card" style="width: 500px; background-color: var(--card-color); border: 1px solid var(--border-color); margin: 30px auto; padding: 25px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+            <div class="card-header" style="font-size: 20px; font-weight: 700; color: var(--success-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">🗺️ Excel Kolon Eşleştirme Sihirbazı</div>
+            <div style="font-size: 13px; color: #9aa0a6; margin-bottom: 20px; line-height: 1.6;">
+                Yüklediğiniz Excel'deki kolon başlıklarını, sistemin gereksinim duyduğu fatura alanları ile eşleştirin. 
+                Sistem eşleştirmeyi bir sonraki dosyanız için otomatik hatırlayacaktır.
+            </div>
+            
+            <input type="hidden" id="mapped-filename">
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px;">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">Ürün / Hizmet Adı Kolonu:</span>
+                    <select id="map-urun" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">Miktar Kolonu:</span>
+                    <select id="map-miktar" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">Birim Kolonu:</span>
+                    <select id="map-birim" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">Birim Fiyat Kolonu:</span>
+                    <select id="map-fiyat" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">KDV Oranı (%) Kolonu:</span>
+                    <select id="map-kdv" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">İskonto Tutarı Kolonu:</span>
+                    <select id="map-iskonto" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">İlişkili Fatura No Kolonu (İade İçin):</span>
+                    <select id="map-iliskili-no" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #eceff1;">İlişkili Fatura Tarihi Kolonu (İade İçin):</span>
+                    <select id="map-iliskili-tarih" style="width: 100%; padding: 8px; border-radius: 6px;"></select>
+                </div>
+            </div>
+            
+            <div class="input-group" style="justify-content: flex-end; gap: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <button class="btn-secondary" onclick="closeMappingModal()" style="padding: 10px 20px;">İptal</button>
+                <button class="btn-success" onclick="submitExcelMapping()" style="padding: 10px 20px;">Eşleştirmeyi Onayla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hata Ekran Görüntüsü Modalı -->
+    <div id="error-screenshot-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 2000; padding: 20px;">
+        <div class="card" style="max-width: 90%; max-height: 90vh; background-color: var(--card-color); border: 2px solid var(--danger-color); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+            <div class="card-header" style="font-size: 16px; font-weight: bold; color: var(--danger-color); display: flex; justify-content: space-between; align-items: center; padding: 15px;">
+                <span>📸 Portal Hata Ekran Görüntüsü</span>
+                <button class="btn-secondary" onclick="closeErrorScreenshotModal()" style="padding: 5px 12px; font-size: 13px;">Kapat [X]</button>
+            </div>
+            <div style="flex: 1; overflow: auto; text-align: center; background: #000; padding: 10px; display: flex; align-items: center; justify-content: center;">
+                <img id="error-screenshot-img" src="" style="max-width: 100%; max-height: 70vh; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.8);">
+            </div>
+        </div>
+    </div>
+
+    <!-- Yardım & Hakkında Modal -->
+    <div id="help-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+        <div class="card" style="max-width: 550px; width: 100%; background-color: var(--card-color); border: 1px solid var(--border-color); max-height: 90vh; overflow-y: auto;">
+            <div class="card-header" style="font-size: 16px; font-weight: bold; color: var(--accent-color);">❓ Ödeal Fatura Otomasyonu - Yardım & Hakkında</div>
+            <div style="font-size: 13px; line-height: 1.6; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; color: #cfd8dc; text-align: left;">
+                <p><strong>Bu Sistem Ne İşe Yarar?</strong><br>
+                Bu otomasyon paneli, yerel Excel fatura verilerinizi (`ornek.xlsx` şablonuna göre hazırlanmış) okuyarak Selenium altyapısı ile Ödeal fatura portalına otomatik olarak kaydeder ve işler.</p>
+                
+                <p><strong>Nasıl Kullanılır? (Adım Adım)</strong></p>
+                <ol style="padding-left: 18px; display: flex; flex-direction: column; gap: 6px;">
+                    <li><strong>Oturum Açma:</strong> E-posta ve şifrenizi girin. <em>(Giriş kutularındayken Enter'a basabilirsiniz.)</em> SMS onay kodu geldiğinde kodu girip <strong>Kodu Onayla</strong>'ya (veya Enter'a) tıklayın. Oturum başarılı olduğunda mail adresiniz yeşil renkle yazacaktır.</li>
+                    <li><strong>Firma Seçimi:</strong> Listeden fatura keseceğiniz müşteriyi seçin. <strong>Başlat</strong> butonuna tıklayın. Sistem sayfayı otomatik olarak aşağı kaydıracaktır.</li>
+                    <li><strong>Excel Yükleme:</strong> Fatura kalemlerini barındıran excel dosyanızı <strong>excel_belgeleri</strong> klasörüne atın. Arayüzden bu dosyayı seçip veya yenileyip (🔄) yükleyin. Sistem kalemleri ve toplamları anında hesaplayacaktır.</li>
+                    <li><strong>İade Faturaları Uyarısı:</strong> Eğer iade faturası kesiyorsanız ve fatura tarihi girilmemişse, sistem hata uyarısını otomatik kapatarak bugünün tarihini takvimden seçmeyi yeniden deneyecektir.</li>
+                    <li><strong>Faturaları İşle:</strong> Her şey hazır olduğunda <strong>Faturaları İşle</strong> butonuna basarak tüm ürün girişlerini ve iskontoları otomatik olarak Ödeal sistemine kaydettirin.</li>
+                </ol>
+            </div>
+            <div class="input-group" style="justify-content: flex-end;">
+                <button class="btn-primary" onclick="closeHelpModal()">Anladım</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firma Detay & Düzenleme Modalı -->
+    <div id="edit-company-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000;">
+        <div class="card" style="width: 450px; background-color: var(--card-color); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+            <div class="card-header" style="font-size: 18px; font-weight: 700; color: var(--accent-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">🏢 Firma Detayı ve Düzenleme</div>
+            <input type="hidden" id="edit-company-old-tax">
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px;">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 11px; color: gray;">Firma Kısa Adı (Başlık)</span>
+                    <input type="text" id="edit-company-title" placeholder="Firma Kısa Adı">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 11px; color: gray;">Vergi / TCKN No</span>
+                    <input type="text" id="edit-company-tax" placeholder="Vergi No">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 11px; color: gray;">Şehir</span>
+                    <input type="text" id="edit-company-city" placeholder="Şehir">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 11px; color: gray;">İlçe</span>
+                    <input type="text" id="edit-company-district" placeholder="İlçe">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 11px; color: gray;">Vergi Dairesi</span>
+                    <input type="text" id="edit-company-office" placeholder="Vergi Dairesi">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 11px; color: gray;">Tam Ticari Ünvan</span>
+                    <textarea id="edit-company-fullname" placeholder="Tam Ticari Ünvan" style="height: 60px; padding: 8px; border-radius: 6px; background-color: var(--input-bg); color: white; border: 1px solid var(--border-color); font-family: inherit; resize: none;"></textarea>
+                </div>
+            </div>
+            <div class="input-group" style="justify-content: flex-end; gap: 10px;">
+                <button class="btn-secondary" onclick="closeEditCompanyModal()" style="padding: 8px 16px;">Kapat</button>
+                <button class="btn-success" onclick="saveEditCompany()" style="padding: 8px 16px;">Değişiklikleri Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Özel Bildirim Modalı -->
+    <div id="custom-alert-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1100;">
+        <div class="card" style="width: 380px; text-align: center; background-color: var(--card-color); border: 2px solid var(--accent-color); padding: 30px; margin-bottom: 0;">
+            <div id="custom-alert-icon" style="font-size: 40px; margin-bottom: 15px;">ℹ️</div>
+            <div id="custom-alert-message" style="font-size: 15px; font-weight: 600; margin-bottom: 20px; line-height: 1.5; color: var(--text-color);"></div>
+            <button class="btn-primary" style="width: 120px;" onclick="closeCustomAlert()">Tamam</button>
+        </div>
+    </div>
+
+    <!-- Özel Onay Modalı -->
+    <div id="custom-confirm-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1100;">
+        <div class="card" style="width: 400px; text-align: center; background-color: var(--card-color); border: 2px solid var(--warning-color); padding: 30px; margin-bottom: 0;">
+            <div style="font-size: 40px; margin-bottom: 15px;">⚠️</div>
+            <div id="custom-confirm-message" style="font-size: 15px; font-weight: 600; margin-bottom: 20px; line-height: 1.5; color: var(--text-color);"></div>
+            <div class="input-group" style="justify-content: center; gap: 15px; margin-bottom: 0;">
+                <button class="btn-secondary" id="custom-confirm-cancel-btn">İptal</button>
+                <button class="btn-danger" id="custom-confirm-ok-btn">Evet, Onayla</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

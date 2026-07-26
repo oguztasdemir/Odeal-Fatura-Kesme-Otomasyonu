@@ -20,7 +20,7 @@ def start_watcher():
                 if any(ignored in root for ignored in [".git", "venv", ".venv", "__pycache__"]):
                     continue
                 for filename in filenames:
-                    if filename.endswith('.py') or filename.endswith('.html'):
+                    if (filename.endswith('.py') and "html_template.py" not in filename) or filename.endswith('.html'):
                         files.append(os.path.join(root, filename))
             return files
 
@@ -47,11 +47,61 @@ def start_watcher():
                 changed = True
 
             if changed:
-                print("\n[Watcher] Dosya değişikliği algılandı, sunucu otomatik olarak yeniden başlatılıyor...\n")
-                quoted_args = [f'"{arg}"' if ' ' in arg else arg for arg in sys.argv]
-                os.execv(sys.executable, [sys.executable] + quoted_args)
+                restart_needed = False
+                for f in current_files:
+                    try:
+                        mtime = os.path.getmtime(f)
+                        if f not in watched_files or watched_files[f] != mtime:
+                            if "config.py" in f or "main_browser.py" in f:
+                                restart_needed = True
+                                break
+                    except:
+                        pass
+                
+                if restart_needed:
+                    print("\n[Watcher] Kritik dosya değişikliği algılandı, sunucu yeniden başlatılıyor...\n")
+                    args = sys.argv.copy()
+                    if "--restarted" not in args:
+                        args.append("--restarted")
+                    quoted_args = [f'"{arg}"' if ' ' in arg else arg for arg in args]
+                    os.execv(sys.executable, [sys.executable] + quoted_args)
+                else:
+                    print("\n[Hot-Reload] Kod değişikliği algılandı, modüller canlı olarak yenilendi.\n")
+                    # Update cache without restart
+                    for f in current_files:
+                        try:
+                            watched_files[f] = os.path.getmtime(f)
+                        except:
+                            pass
 
     threading.Thread(target=watch, daemon=True).start()
+
+class DynamicHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        import importlib
+        import src.config
+        import src.automation_core
+        import src.automation_login
+        import src.automation_download
+        import src.automation_invoice
+        import src.automation_sync
+        import src.automation_queue
+        import src.automation
+        import src.server
+        try:
+            importlib.reload(src.automation_core)
+            importlib.reload(src.automation_login)
+            importlib.reload(src.automation_download)
+            importlib.reload(src.automation_invoice)
+            importlib.reload(src.automation_sync)
+            importlib.reload(src.automation_queue)
+            importlib.reload(src.automation)
+            importlib.reload(src.server)
+        except Exception as e:
+            print(f"[Hot-Reload] Yenileme Hatası: {e}")
+        
+        # Delegate socket connection to the dynamically loaded RequestHandler
+        src.server.RequestHandler(self.request, self.client_address, self.server)
 
 if __name__ == "__main__":
     start_watcher()
@@ -65,15 +115,17 @@ if __name__ == "__main__":
     # Find next available port if 8000 is taken
     while True:
         try:
-            handler = RequestHandler
-            httpd = socketserver.TCPServer(("", PORT), handler)
+            # Use DynamicHandler as the socket server delegate
+            httpd = socketserver.TCPServer(("", PORT), DynamicHandler)
             break
         except OSError:
             PORT += 1
             
     url = f"http://localhost:{PORT}"
     print(f"Uygulama sunucusu başlatıldı: {url}")
-    webbrowser.open(url)
+    
+    if "--restarted" not in sys.argv:
+        webbrowser.open(url)
     
     try:
         httpd.serve_forever()
