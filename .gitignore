@@ -1,21 +1,24 @@
-# Database / Veri Dosyaları (Hassas Veriler)
-firmalar.json
-ayarlar.json
-hesaplar.json
+# Güvenlik & Gizlilik Korumaları (Asla GitHub'a Gitmez)
+chrome_profile/
+indirilen_faturalar/
+hata_ekranlari/
+excel_belgeleri/
 yedekler/
+*.xlsx
+*.zip
+*.png
+*.log
 
-# Yerel Excel Klasöründeki Dosyalar (Örnek şablon hariç)
-excel_belgeleri/*
-!excel_belgeleri/ornek.xlsx
+# Ortam & Kimlik Bilgileri
+.env
+*.env
+*.pem
+*.key
 
-# Python Önbellek Dosyaları
+# Python
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-
-# Sanal Ortam Dosyaları
-.venv/
-venv/
-env/
-.env
+.pytest_cache/
+.vscode/
+.idea/
